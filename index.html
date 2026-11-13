@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recipee Downloader</title>
+    <!-- Tailwind CSS untuk styling modern dan responsif -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Library jsPDF untuk export ke PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Library docx untuk export ke DOCX asli -->
+    <script src="https://unpkg.com/docx@7.8.2/build/index.js"></script>
+    <!-- Lucide Icons untuk ikon yang bersih -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar untuk area teks resep */
+        textarea::-webkit-scrollbar {
+            width: 8px;
+        }
+        textarea::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        textarea::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        textarea::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex items-center justify-center p-4 sm:p-6 text-slate-800">
+
+    <!-- Container Utama -->
+    <div class="w-full max-w-2xl bg-white rounded-2xl shadow-xl border border-slate-200/80 p-6 sm:p-8 transition-all">
+        
+        <!-- Header sesuai mockup -->
+        <div class="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-600 text-white p-2.5 rounded-xl shadow-sm">
+                    <i data-lucide="chef-hat" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Recipee Downloader</h1>
+                    <p class="text-xs sm:text-sm text-slate-500">Ekstrak resep masakan dari video YouTube dengan AI</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Baris Input Link (Sesuai Gambar: Label "Link" di kiri, Input Box di kanan) -->
+        <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-5">
+            <label for="youtubeLink" class="text-base font-bold text-slate-800 sm:w-16 shrink-0">
+                Link
+            </label>
+            <div class="relative w-full">
+                <input 
+                    type="url" 
+                    id="youtubeLink" 
+                    placeholder="Tempel link video YouTube di sini (contoh: https://youtu.be/...)" 
+                    class="w-full px-4 py-3 bg-slate-50 border-2 border-slate-300 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white transition-colors pr-10"
+                >
+                <button 
+                    id="clearBtn" 
+                    onclick="clearInput()" 
+                    title="Hapus Link"
+                    class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                >
+                    <i data-lucide="x-circle" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Baris Tombol Aksi (Sesuai Gambar: Get Recipee di kiri, Download di kanan) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-6 mb-6">
+            <button 
+                id="getRecipeBtn" 
+                onclick="handleGetRecipe()" 
+                class="w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+                <i data-lucide="sparkles" class="w-5 h-5"></i>
+                <span>Get Recipee</span>
+            </button>
+
+            <button 
+                id="downloadBtn" 
+                onclick="openDownloadModal()" 
+                class="w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
+            >
+                <i data-lucide="download" class="w-5 h-5"></i>
+                <span>Download</span>
+            </button>
+        </div>
+
+        <!-- Kotak Output Teks Resep (Sesuai Gambar: Kotak besar di bagian bawah) -->
+        <div class="relative">
+            <!-- Toolbar kecil di atas kotak hasil -->
+            <div class="flex items-center justify-between mb-2 px-1">
+                <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Hasil Transkripsi Resep</span>
+                <button 
+                    onclick="copyRecipe()" 
+                    class="text-xs font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-blue-50 transition-colors"
+                >
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span id="copyText">Salin Teks</span>
+                </button>
+            </div>
+
+            <!-- Area Teks Utama -->
+            <div class="relative">
+                <textarea 
+                    id="recipeOutput" 
+                    rows="13" 
+                    placeholder="Hasil ekstraksi resep (Bahan-bahan, Bumbu, dan Cara Membuat) akan muncul di kotak ini. Anda juga dapat mengedit teks ini secara langsung sebelum mengunduhnya..."
+                    class="w-full p-4 sm:p-5 bg-white border-2 border-slate-300 rounded-xl text-slate-800 text-sm sm:text-base leading-relaxed focus:outline-none focus:border-blue-600 transition-colors resize-y"
+                ></textarea>
+
+                <!-- Overlay Loading saat AI sedang memproses -->
+                <div id="loadingOverlay" class="hidden absolute inset-0 bg-white/90 backdrop-blur-sm rounded-xl flex flex-col items-center justify-center p-6 text-center z-10 border-2 border-blue-200">
+                    <div class="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+                    <h3 class="text-base font-bold text-slate-800 mb-1">Gemini AI Sedang Bekerja...</h3>
+                    <p class="text-xs sm:text-sm text-slate-500 max-w-xs">Menganalisis konten video YouTube dan menyusun takaran bahan serta langkah memasak.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status / Sumber Informasi (Jika ada) -->
+        <div id="sourceInfo" class="hidden mt-3 text-xs text-slate-500 flex items-center gap-1.5 px-1">
+            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 shrink-0"></i>
+            <span id="sourceText">Resep berhasil diekstrak.</span>
+        </div>
+    </div>
+
+    <!-- Modal Pilihan Format Download (.txt, .docx, .pdf) -->
+    <div id="downloadModal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 transition-opacity">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-100 transform transition-all scale-100">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-slate-900">Pilih Format Penyimpanan</h3>
+                <button onclick="closeDownloadModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <p class="text-sm text-slate-500 mb-5">Pilih format file yang Anda inginkan untuk menyimpan resep masakan ini:</p>
+            
+            <!-- Input Nama File -->
+            <div class="mb-5">
+                <label for="fileNameInput" class="block text-xs font-semibold text-slate-600 uppercase mb-1.5">Nama File</label>
+                <input 
+                    type="text" 
+                    id="fileNameInput" 
+                    value="Resep-Masakan" 
+                    class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-800 focus:outline-none focus:border-blue-600"
+                >
+            </div>
+
+            <!-- Pilihan 3 Format Tombol -->
+            <div class="grid grid-cols-3 gap-3 mb-2">
+                <!-- Format TXT -->
+                <button onclick="downloadAs('txt')" class="flex flex-col items-center justify-center p-4 border-2 border-slate-200 hover:border-blue-600 hover:bg-blue-50/50 rounded-xl transition-all group cursor-pointer">
+                    <div class="w-10 h-10 rounded-lg bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-blue-600 flex items-center justify-center mb-2 transition-colors">
+                        <i data-lucide="file-text" class="w-5 h-5"></i>
+                    </div>
+                    <span class="font-bold text-sm text-slate-800 group-hover:text-blue-700">.TXT</span>
+                    <span class="text-[11px] text-slate-400 mt-0.5">Teks Biasa</span>
+                </button>
+
+                <!-- Format DOCX -->
+                <button onclick="downloadAs('docx')" class="flex flex-col items-center justify-center p-4 border-2 border-slate-200 hover:border-blue-600 hover:bg-blue-50/50 rounded-xl transition-all group cursor-pointer">
+                    <div class="w-10 h-10 rounded-lg bg-blue-50 group-hover:bg-blue-100 text-blue-600 flex items-center justify-center mb-2 transition-colors">
+                        <i data-lucide="file-type-2" class="w-5 h-5"></i>
+                    </div>
+                    <span class="font-bold text-sm text-slate-800 group-hover:text-blue-700">.DOCX</span>
+                    <span class="text-[11px] text-slate-400 mt-0.5">MS Word</span>
+                </button>
+
+                <!-- Format PDF -->
+                <button onclick="downloadAs('pdf')" class="flex flex-col items-center justify-center p-4 border-2 border-slate-200 hover:border-red-500 hover:bg-red-50/50 rounded-xl transition-all group cursor-pointer">
+                    <div class="w-10 h-10 rounded-lg bg-red-50 group-hover:bg-red-100 text-red-600 flex items-center justify-center mb-2 transition-colors">
+                        <i data-lucide="file-badge" class="w-5 h-5"></i>
+                    </div>
+                    <span class="font-bold text-sm text-slate-800 group-hover:text-red-700">.PDF</span>
+                    <span class="text-[11px] text-slate-400 mt-0.5">Dokumen PDF</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Toast Notification (Pengganti alert()) -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+        <div id="toastContent" class="bg-slate-900 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 text-sm font-medium">
+            <i id="toastIcon" data-lucide="info" class="w-5 h-5 text-blue-400"></i>
+            <span id="toastMessage">Pesan notifikasi</span>
+        </div>
+    </div>
+
+    <script>
+        // Inisialisasi ikon Lucide
+        lucide.createIcons();
+
+        // Konfigurasi API Gemini
+        const apiKey = ""; // API Key otomatis disediakan oleh lingkungan runtime
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+        // Referensi Elemen DOM
+        const youtubeLinkInput = document.getElementById('youtubeLink');
+        const clearBtn = document.getElementById('clearBtn');
+        const getRecipeBtn = document.getElementById('getRecipeBtn');
+        const recipeOutput = document.getElementById('recipeOutput');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const downloadModal = document.getElementById('downloadModal');
+        const fileNameInput = document.getElementById('fileNameInput');
+        const sourceInfo = document.getElementById('sourceInfo');
+        const sourceText = document.getElementById('sourceText');
+
+        // Tampilkan tombol hapus jika ada teks di input
+        youtubeLinkInput.addEventListener('input', () => {
+            if (youtubeLinkInput.value.trim().length > 0) {
+                clearBtn.classList.remove('hidden');
+            } else {
+                clearBtn.classList.add('hidden');
+            }
+        });
+
+        // Fungsi menghapus input link
+        function clearInput() {
+            youtubeLinkInput.value = '';
+            clearBtn.classList.add('hidden');
+            youtubeLinkInput.focus();
+        }
+
+        // Fungsi menampilkan notifikasi Toast (Pengganti alert)
+        let toastTimeout;
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMessage.textContent = message;
+            
+            if (type === 'error') {
+                toastIcon.setAttribute('data-lucide', 'alert-circle');
+                toastIcon.className = 'w-5 h-5 text-red-400 shrink-0';
+            } else if (type === 'success') {
+                toastIcon.setAttribute('data-lucide', 'check-circle');
+                toastIcon.className = 'w-5 h-5 text-emerald-400 shrink-0';
+            } else {
+                toastIcon.setAttribute('data-lucide', 'info');
+                toastIcon.className = 'w-5 h-5 text-blue-400 shrink-0';
+            }
+            lucide.createIcons();
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3500);
+        }
+
+        // Fungsi validasi link YouTube dan ekstraksi Video ID
+        function extractYouTubeID(url) {
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=|shorts\/)([^#\&\?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[2].length === 11) ? match[2] : null;
+        }
+
+        // Fungsi fetch dengan Exponential Backoff untuk keandalan API
+        async function fetchWithRetry(url, options, maxRetries = 4) {
+            const delays = [1000, 2000, 4000, 8000];
+            for (let i = 0; i <= maxRetries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return await response.json();
+                } catch (error) {
+                    if (i === maxRetries) throw error;
+                    await new Promise(resolve => setTimeout(resolve, delays[i]));
+                }
+            }
+        }
+
+        // Fungsi Utama: Memproses Link YouTube dengan Gemini AI
+        async function handleGetRecipe() {
+            const link = youtubeLinkInput.value.trim();
+
+            if (!link) {
+                showToast('Silakan tempel link YouTube terlebih dahulu!', 'error');
+                youtubeLinkInput.focus();
+                return;
+            }
+
+            const videoId = extractYouTubeID(link);
+            if (!videoId) {
+                showToast('Format link YouTube tidak valid. Pastikan link berasal dari YouTube.', 'error');
+                youtubeLinkInput.focus();
+                return;
+            }
+
+            // Mulai status loading
+            getRecipeBtn.disabled = true;
+            loadingOverlay.classList.remove('hidden');
+            sourceInfo.classList.add('hidden');
+
+            try {
+                // Coba ambil judul video terlebih dahulu menggunakan oEmbed publik (tanpa API key) agar konteks pencarian Gemini sangat akurat
+                let videoTitle = "";
+                try {
+                    const oembedRes = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`);
+                    const oembedData = await oembedRes.json();
+                    if (oembedData && oembedData.title) {
+                        videoTitle = oembedData.title;
+                    }
+                } catch (e) {
+                    // Abaikan jika oembed gagal, Gemini tetap akan mencari via URL/ID
+                }
+
+                const systemPrompt = `Anda adalah asisten koki profesional dan ahli transkripsi resep kuliner. 
+Tugas Anda adalah mencari informasi, transkrip, atau deskripsi dari video YouTube yang diberikan oleh pengguna, lalu menuliskannya kembali menjadi resep masakan yang sangat rapi, jelas, dan mudah diikuti dalam Bahasa Indonesia.
+
+Aturan Format Output:
+1. Gunakan teks polos (plain text) yang terstruktur rapi tanpa tanda bintang markdown berlebihan (seperti ** atau ##) agar nyaman dibaca di kotak teks biasa dan rapi saat diunduh ke TXT, DOCX, maupun PDF.
+2. Susun dengan format berikut:
+   JUDUL RESEP: [Nama Masakan]
+   Porsi / Waktu: [Estimasi jika ada]
+
+   BAHAN-BAHAN:
+   - [Takaran dan nama bahan]
+
+   BUMBU HALUS / PELENGKAP (jika ada):
+   - [Takaran dan nama bumbu]
+
+   CARA MEMBUAT:
+   1. [Langkah pertama secara detail]
+   2. [Langkah kedua secara detail]
+   ...
+
+   TIPS TAMBAHAN (jika ada):
+   - [Tips dari video]`;
+
+                const userQuery = `Tolong buatkan transkripsi resep lengkap dari video YouTube berikut:
+Link: ${link}
+Video ID: ${videoId}
+${videoTitle ? `Judul Video: ${videoTitle}` : ''}
+
+Cari detail resep, bahan, takaran, dan langkah-langkah memasak yang ada di dalam video tersebut.`;
+
+                const payload = {
+                    contents: [{ parts: [{ text: userQuery }] }],
+                    tools: [{ "google_search": {} }],
+                    systemInstruction: {
+                        parts: [{ text: systemPrompt }]
+                    }
+                };
+
+                const result = await fetchWithRetry(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const candidate = result.candidates?.[0];
+                const generatedText = candidate?.content?.parts?.[0]?.text;
+
+                if (generatedText) {
+                    // Bersihkan sisa markdown bold/italic jika masih ada agar bersih di textarea
+                    const cleanText = generatedText.replace(/\*\*/g, '').replace(/### /g, '').replace(/## /g, '');
+                    recipeOutput.value = cleanText;
+
+                    // Otomatis isi saran nama file dari baris pertama judul resep
+                    const firstLine = cleanText.split('\n').find(line => line.trim().length > 0);
+                    if (firstLine) {
+                        const suggestedName = firstLine
+                            .replace(/JUDUL RESEP:/i, '')
+                            .replace(/[^a-zA-Z0-9\s-]/g, '')
+                            .trim()
+                            .replace(/\s+/g, '-');
+                        if (suggestedName) {
+                            fileNameInput.value = suggestedName.substring(0, 40);
+                        }
+                    }
+
+                    sourceInfo.classList.remove('hidden');
+                    sourceText.textContent = videoTitle 
+                        ? `Berhasil memproses: "${videoTitle}"` 
+                        : 'Resep berhasil diekstrak dari video YouTube.';
+                    
+                    showToast('Resep berhasil didapatkan!', 'success');
+                } else {
+                    throw new Error('Tidak ada respons teks dari AI.');
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                showToast('Gagal memproses video. Silakan periksa koneksi atau coba link lain.', 'error');
+            } finally {
+                getRecipeBtn.disabled = false;
+                loadingOverlay.classList.add('hidden');
+            }
+        }
+
+        // Fungsi Salin Teks ke Clipboard
+        function copyRecipe() {
+            const text = recipeOutput.value.trim();
+            if (!text) {
+                showToast('Belum ada teks resep untuk disalin.', 'error');
+                return;
+            }
+            recipeOutput.select();
+            document.execCommand('copy');
+            window.getSelection().removeAllRanges();
+            
+            const copyTextEl = document.getElementById('copyText');
+            copyTextEl.textContent = 'Tersalin!';
+            showToast('Resep disalin ke clipboard!', 'success');
+            
+            setTimeout(() => {
+                copyTextEl.textContent = 'Salin Teks';
+            }, 2000);
+        }
+
+        // Kontrol Modal Download
+        function openDownloadModal() {
+            const content = recipeOutput.value.trim();
+            if (!content) {
+                showToast('Kotak resep masih kosong! Klik "Get Recipee" terlebih dahulu.', 'error');
+                return;
+            }
+            downloadModal.classList.remove('hidden');
+        }
+
+        function closeDownloadModal() {
+            downloadModal.classList.add('hidden');
+        }
+
+        // Tutup modal jika klik di luar area kartu modal
+        downloadModal.addEventListener('click', (e) => {
+            if (e.target === downloadModal) {
+                closeDownloadModal();
+            }
+        });
+
+        // Fungsi Helper Trigger Unduhan File di Browser
+        function triggerBrowserDownload(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Fungsi Ekspor ke .TXT, .DOCX, atau .PDF
+        async function downloadAs(format) {
+            const content = recipeOutput.value.trim();
+            if (!content) {
+                showToast('Tidak ada konten resep untuk diunduh.', 'error');
+                return;
+            }
+
+            let rawFileName = fileNameInput.value.trim() || 'Resep-Masakan';
+            // Sanitasi nama file
+            const safeFileName = rawFileName.replace(/[^a-zA-Z0-9-_\s]/g, '').trim() || 'Resep-Masakan';
+
+            try {
+                if (format === 'txt') {
+                    // 1. Download sebagai .TXT
+                    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+                    triggerBrowserDownload(blob, `${safeFileName}.txt`);
+                    showToast(`Berhasil mengunduh ${safeFileName}.txt`, 'success');
+
+                } else if (format === 'docx') {
+                    // 2. Download sebagai .DOCX menggunakan library docx.js
+                    const { Document, Packer, Paragraph, TextRun } = window.docx;
+                    
+                    const lines = content.split('\n');
+                    const paragraphs = lines.map((line, index) => {
+                        const isHeader = line.trim().endsWith(':') || line.startsWith('JUDUL RESEP');
+                        return new Paragraph({
+                            children: [
+                                new TextRun({
+                                    text: line,
+                                    bold: isHeader || index === 0,
+                                    size: index === 0 ? 28 : 24, // 14pt untuk judul, 12pt untuk isi
+                                    font: "Calibri"
+                                })
+                            ],
+                            spacing: {
+                                after: 120
+                            }
+                        });
+                    });
+
+                    const doc = new Document({
+                        sections: [{
+                            properties: {},
+                            children: paragraphs
+                        }]
+                    });
+
+                    const blob = await Packer.toBlob(doc);
+                    triggerBrowserDownload(blob, `${safeFileName}.docx`);
+                    showToast(`Berhasil mengunduh ${safeFileName}.docx`, 'success');
+
+                } else if (format === 'pdf') {
+                    // 3. Download sebagai .PDF menggunakan jsPDF
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF({
+                        orientation: 'portrait',
+                        unit: 'mm',
+                        format: 'a4'
+                    });
+
+                    const marginLeft = 15;
+                    const marginTop = 20;
+                    const maxLineWidth = 180; // A4 width (210mm) - margins
+                    const lineHeight = 6.5;
+                    const pageHeight = doc.internal.pageSize.height;
+
+                    doc.setFont("helvetica", "normal");
+                    doc.setFontSize(11);
+
+                    // Pecah teks agar otomatis wrap sesuai lebar halaman A4
+                    const splitLines = doc.splitTextToSize(content, maxLineWidth);
+                    let cursorY = marginTop;
+
+                    splitLines.forEach((line, idx) => {
+                        // Tambah halaman baru jika teks melebihi batas bawah halaman
+                        if (cursorY + lineHeight > pageHeight - 15) {
+                            doc.addPage();
+                            cursorY = marginTop;
+                        }
+                        
+                        // Tebalkan baris judul atau sub-judul
+                        if (idx === 0 || line.trim().endsWith(':') || line.startsWith('JUDUL RESEP')) {
+                            doc.setFont("helvetica", "bold");
+                        } else {
+                            doc.setFont("helvetica", "normal");
+                        }
+
+                        doc.text(line, marginLeft, cursorY);
+                        cursorY += lineHeight;
+                    });
+
+                    doc.save(`${safeFileName}.pdf`);
+                    showToast(`Berhasil mengunduh ${safeFileName}.pdf`, 'success');
+                }
+
+                closeDownloadModal();
+            } catch (err) {
+                console.error('Download error:', err);
+                showToast('Terjadi kesalahan saat membuat file unduhan.', 'error');
+            }
+        }
+    </script>
+</body>
+</html>
